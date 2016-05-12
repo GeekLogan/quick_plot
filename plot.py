@@ -28,7 +28,7 @@ dim = 2
 	
 for line in sys.stdin:
         split = line.split("\t")
-        if len( split ) is not dim: continue
+        if len( split ) < dim: continue
         data.append( ( float(split[0]), float(split[1]) ) )
 
 if len(data) is 0: exit()
