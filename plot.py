@@ -4,8 +4,7 @@ dim = 2
 
 def formString( input ):
 	out = ''
-	for i in input:
-		out += i
+	for i in input: out += i
 	return out
 
 def getTermSize():
@@ -25,21 +24,21 @@ def getTermSize():
 	return int(cr[1]), int(cr[0]) - 1
 
 def readin():
-	data = []
+	out = []
 	for line in sys.stdin:
 			split = line.split("\t")
 			if len( split ) is not dim: continue
-			data.append( ( float(split[0]), float(split[1]) ) )
-	return data
+			out.append( ( float(split[0]), float(split[1]) ) )
+	return out
 	
 def getextrema( data ):
-	extrema = []
+	out = []
 	for i in range( dim ):
 		tmp = dict()
 		tmp['min'] = data[0][i]
 		tmp['max'] = data[0][i]
-		extrema.append( tmp )
-	return extrema
+		out.append( tmp )
+	return out
 
 def addaxis( termstate, extrema, termsize ):
 	xscale = abs( (extrema[0]['max'] - extrema[0]['min']) / float( termsize[0] ) )
@@ -57,10 +56,11 @@ def addaxis( termstate, extrema, termsize ):
 		elif yzero > len(termstate) - 1: yzero = len(termstate) - 1
 		termstate[yzero] = [ '-' ] * termsize[0]
 
-	if extrema[0]['min'] <= 0 and extrema[0]['max'] >= 0 and extrema[1]['min'] <= 0 and extrema[1]['max'] >= 0:
-		xzero = int( round( abs( extrema[0]['min'] / xscale ) ) ) 
-		yzero = termsize[1] - int( round( abs( extrema[1]['min'] / yscale ) ) ) 
-		termstate[yzero][xzero] = '+'
+	if extrema[0]['min'] <= 0 and extrema[0]['max'] >= 0:
+		if extrema[1]['min'] <= 0 and extrema[1]['max'] >= 0:
+			xzero = int( round( abs( extrema[0]['min'] / xscale ) ) ) 
+			yzero = termsize[1] - int( round( abs( extrema[1]['min'] / yscale ) ) ) 
+			termstate[yzero][xzero] = '+'
 
 def plotdata( termstate, data, extrema, termsize ):
 	xscale = abs( (extrema[0]['max'] - extrema[0]['min']) / float( termsize[0] ) )
@@ -78,10 +78,9 @@ def plotdata( termstate, data, extrema, termsize ):
 		termstate[ycord][xcord] = 'O'
 		
 def framebuffer( termsize ):
-	termstate = []
-	for y in range( termsize[1] ):
-		termstate.append( [' '] * termsize[0] )
-	return termstate
+	out = []
+	for y in range( termsize[1] ): out.append( [' '] * termsize[0] )
+	return out
 
 def draw( termstate ):
 	for line in termstate:
