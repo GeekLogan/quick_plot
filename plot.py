@@ -1,5 +1,7 @@
 import os, fcntl, termios, struct, sys
 
+dim = 2
+
 def formString( input ):
 	out = ''
 	for i in input:
@@ -19,79 +21,93 @@ def getTermSize():
 			cr = ioctl_GWINSZ(fd)
 			os.close(fd)
 		except: pass
-	if not cr:
-		cr = (env.get('LINES', 25), env.get('COLUMNS', 80))
-	return int(cr[1]), int(cr[0])
+	if not cr: cr = (env.get('LINES', 25), env.get('COLUMNS', 80))
+	return int(cr[1]), int(cr[0]) - 1
 
-data, extrema = [], []
-dim = 2	
+def readin():
+	data = []
+	for line in sys.stdin:
+			split = line.split("\t")
+			if len( split ) is not dim: continue
+			data.append( ( float(split[0]), float(split[1]) ) )
+	return data
 	
-for line in sys.stdin:
-        split = line.split("\t")
-        if len( split ) < dim: continue
-        data.append( ( float(split[0]), float(split[1]) ) )
+def getextrema( data ):
+	extrema = []
+	for i in range( dim ):
+		tmp = dict()
+		tmp['min'] = data[0][i]
+		tmp['max'] = data[0][i]
+		extrema.append( tmp )
+	return extrema
 
-if len(data) is 0: exit()
+def addaxis( termstate, extrema, termsize ):
+	xscale = abs( (extrema[0]['max'] - extrema[0]['min']) / float( termsize[0] ) )
+	yscale = abs( (extrema[1]['max'] - extrema[1]['min']) / float( termsize[1] ) )
 
-extrema	= [] 
-for i in range( dim ):
-	tmp = dict()
-	tmp['min'] = data[0][i]
-	tmp['max'] = data[0][i]
-	extrema.append( tmp )
+	if extrema[0]['min'] <= 0 and xmax >= 0:
+		xzero = int( round( abs( extrema[0]['min'] / xscale ) ) ) 
+		if xzero < 0: xzero = 0
+		elif xzero > len( termstate[0] ) - 1: xzero = len( termstate[0] ) - 1
+		for line in termstate: line[xzero] = '|'
 
-for pt in data:
-        for i in range( dim ):
-		if pt[i] < extrema[i]['min']:
-			extrema[i]['min'] = pt[i]
-		if pt[i] > extrema[i]['max']:
-			extrema[i]['max'] = pt[i]
+	if extrema[1]['min'] <= 0 and extrema[1]['max'] >= 0:
+		yzero = termsize[1] -  int( round( abs( extrema[1]['min'] / yscale ) ) ) 
+		if yzero < 0: yzero = 0
+		elif yzero > len(termstate) - 1: yzero = len(termstate) - 1
+		termstate[yzero] = [ '-' ] * termsize[0]
 
-termsize = (getTermSize()[0], getTermSize()[1] - 1)
+	if extrema[0]['min'] <= 0 and extrema[0]['max'] >= 0 and extrema[1]['min'] <= 0 and extrema[1]['max'] >= 0:
+		xzero = int( round( abs( extrema[0]['min'] / xscale ) ) ) 
+		yzero = termsize[1] - int( round( abs( extrema[1]['min'] / yscale ) ) ) 
+		termstate[yzero][xzero] = '+'
 
-termstate = []
-for y in range( termsize[1] ):
-	termstate.append( [' '] * termsize[0] )
+def plotdata( termstate, data, extrema, termsize ):
+	xscale = abs( (extrema[0]['max'] - extrema[0]['min']) / float( termsize[0] ) )
+	yscale = abs( (extrema[1]['max'] - extrema[1]['min']) / float( termsize[1] ) )
 
-###BAD CODE AHEAD
+	for pt in data:
+		xcord = int( round( (pt[0] - extrema[0]['min']) / xscale) )
+		if xcord < 0: xcord = 0
+		elif xcord > len( termstate[0] ) - 1: xcord = len( termstate[0] ) - 1
 
-xmin = extrema[0]['min']
-xmax = extrema[0]['max']
-xscale = abs( (xmax - xmin) / float( termsize[0] ) )
+		ycord = termsize[1] - int( round( (pt[1] - extrema[1]['min']) / yscale) )
+		if ycord < 0: ycord = 0
+		elif ycord > len( termstate ) - 1: ycord = len( termstate ) - 1
 
-ymin = extrema[1]['min']
-ymax = extrema[1]['max']
-yscale = abs( (ymax - ymin) / float( termsize[1] ) )
+		termstate[ycord][xcord] = 'O'
+		
+def framebuffer( termsize ):
+	termstate = []
+	for y in range( termsize[1] ):
+		termstate.append( [' '] * termsize[0] )
+	return termstate
 
-if xmin <= 0 and xmax >= 0:
-	xzero = int( round( abs( xmin / xscale ) ) ) 
-	if xzero < 0: xzero = 0
-	elif xzero > len( termstate[0] ) - 1: xzero = len( termstate[0] ) - 1
+def draw( termstate ):
+	for line in termstate:
+		print formString( line )
 
-	for line in termstate: line[xzero] = '|'
-
-if ymin <= 0 and ymax >= 0:
-	yzero = termsize[1] -  int( round( abs( ymin / yscale ) ) ) 
-	if yzero < 0: yzero = 0
-	elif yzero > len(termstate) - 1: yzero = len(termstate) - 1
+def main():
+	extrema = []
 	
-	termstate[yzero] = [ '-' ] * termsize[0]
+	data = readin()
+	if not data: exit()
+	
+	extrema	= getextrema( data )
 
-if xmin <= 0 and xmax >= 0 and ymin <= 0 and ymax >= 0:
-	xzero = int( round( abs( xmin / xscale ) ) ) 
-	yzero = termsize[1] - int( round( abs( ymin / yscale ) ) ) 
-	termstate[yzero][xzero] = '+'	
+	for pt in data:
+			for i in range( dim ):
+				if pt[i] < extrema[i]['min']: extrema[i]['min'] = pt[i]
+				if pt[i] > extrema[i]['max']: extrema[i]['max'] = pt[i]
 
-for pt in data:
-	xcord = int( round( (pt[0] - xmin) / xscale) )
-	if xcord < 0: xcord = 0
-	elif xcord > len( termstate[0] ) - 1: xcord = len( termstate[0] ) - 1
+	termsize = getTermSize()
 
-	ycord = termsize[1] - int( round( (pt[1] - ymin) / yscale) )
-	if ycord < 0: ycord = 0
-	elif ycord > len( termstate ) - 1: ycord = len( termstate ) - 1
+	termstate = framebuffer( termsize )
 
-	termstate[ycord][xcord] = 'O'
+	addaxis( termstate, extrema, termsize )
+	plotdata( termstate, data, extrema, termsize ) 
 
-for line in termstate:
-	print formString( line )
+	draw( termstate )
+
+if __name__ == "__main__":
+    main()
